@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# highway-ocd-benchmark
-=======
 # Highway OCD Benchmark
 
 A small, self-contained harness to **compare overlapping community detection (OCD)
