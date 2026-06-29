@@ -1,0 +1,11 @@
+# Core dependencies for the Highway OCD benchmark.
+# Python 3.9+ recommended.
+networkx>=2.6
+numpy>=1.21
+scipy>=1.7
+pandas>=1.3
+cdlib>=0.2.6        # provides the baseline algorithms + evaluation helpers
+
+# Building the Highway C++ backend additionally needs (system tools, not pip):
+#   - cmake >= 3.10
+#   - a C++17 compiler (clang / g++)
