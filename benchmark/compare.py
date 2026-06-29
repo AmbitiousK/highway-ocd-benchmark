@@ -36,54 +36,55 @@ Cover = List[List[Node]]
 _AUTO = object()  # sentinel: read ground truth from the graph
 
 
-def _run_with_timeout(fn, G: nx.Graph, timeout: Optional[float]) -> Tuple[Optional[Cover], Optional[str], bool, float]:
-    """Run ``fn(G)`` with an optional hard timeout (multiprocessing).
+class _Timeout(Exception):
+    pass
 
-    Returns (cover, error, timed_out, runtime_sec). Falls back to in-process
-    execution if the callable can't be shipped to a worker (e.g. a notebook
-    closure), in which case the timeout is not enforced.
+
+def _run_with_timeout(fn, G: nx.Graph, timeout: Optional[float]) -> Tuple[Optional[Cover], Optional[str], bool, float]:
+    """Run ``fn(G)`` with an optional per-algorithm timeout.
+
+    Uses a cheap in-process SIGALRM alarm (no subprocess, no re-import) so a
+    hanging baseline (e.g. cdlib LFM on a low-mixing graph) is interrupted and
+    recorded as a timeout instead of wedging the whole sweep.
+
+    Returns (cover, error, timed_out, runtime_sec). The alarm needs the main
+    thread on a POSIX system; if unavailable (Windows, worker thread) the call
+    runs without a timeout.
     """
+    import signal
+
     t0 = time.perf_counter()
-    if not timeout:
+    can_alarm = bool(timeout) and hasattr(signal, "SIGALRM")
+
+    if not can_alarm:
         try:
-            cover = fn(G)
-            return cover, None, False, time.perf_counter() - t0
+            return fn(G), None, False, time.perf_counter() - t0
         except Exception as e:  # noqa: BLE001
             return None, f"{type(e).__name__}: {e}", False, time.perf_counter() - t0
 
-    import multiprocessing as mp
-    ctx = mp.get_context("spawn")
-    q: "mp.Queue" = ctx.Queue()
-
-    def _worker(graph, queue):
-        try:
-            queue.put(("ok", fn(graph)))
-        except Exception as e:  # noqa: BLE001
-            queue.put(("err", f"{type(e).__name__}: {e}"))
+    def _handler(signum, frame):
+        raise _Timeout()
 
     try:
-        p = ctx.Process(target=_worker, args=(G, q))
-        p.start()
-    except Exception:
-        # callable not shippable to a worker -> run in-process, no timeout
+        old = signal.signal(signal.SIGALRM, _handler)
+    except ValueError:
+        # not in the main thread -> can't arm the alarm; run without timeout
         try:
-            cover = fn(G)
-            return cover, None, False, time.perf_counter() - t0
+            return fn(G), None, False, time.perf_counter() - t0
         except Exception as e:  # noqa: BLE001
             return None, f"{type(e).__name__}: {e}", False, time.perf_counter() - t0
 
-    p.join(timeout)
-    if p.is_alive():
-        p.terminate()
-        p.join()
+    signal.setitimer(signal.ITIMER_REAL, float(timeout))
+    try:
+        cover = fn(G)
+        return cover, None, False, time.perf_counter() - t0
+    except _Timeout:
         return None, f"timed out after {timeout:.0f}s", True, time.perf_counter() - t0
-    runtime = time.perf_counter() - t0
-    if q.empty():
-        return None, "worker died with no result", False, runtime
-    tag, payload = q.get()
-    if tag == "ok":
-        return payload, None, False, runtime
-    return None, payload, False, runtime
+    except Exception as e:  # noqa: BLE001
+        return None, f"{type(e).__name__}: {e}", False, time.perf_counter() - t0
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, old)
 
 
 def compare_algorithms(

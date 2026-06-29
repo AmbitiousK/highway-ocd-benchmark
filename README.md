@@ -88,14 +88,42 @@ A ready-to-edit template lives in [`examples/add_your_algorithm.py`](examples/ad
 ## One-click runs
 
 ```bash
-# synthetic graphs (LFR + ABCD+o2), full 5-metric panel, writes results/*.csv
+# quick: score every algorithm on one graph, full 5-metric panel
 python examples/run_synthetic.py
-
-# a real-world graph (Q_ov + runtime, per-algorithm timeout)
-python examples/run_realworld.py --graph /path/to/graph.gpickle --timeout 300
 
 # notebook walkthrough
 jupyter notebook examples/quickstart.ipynb
+```
+
+## Experiment suite (figures + tables)
+
+The four paper experiments, each running **all algorithms live** over a graph
+corpus and rendering the paper-style figure plus the numeric tables. Your
+registered algorithm is included automatically.
+
+```bash
+python examples/run_experiments.py                       # all four, shipped corpora
+python examples/run_experiments.py --only performance,overlap
+python examples/run_experiments.py --algos highway,slpa,demon,lfm --timeout 120
+python examples/run_experiments.py --only realworld --realworld /path/to/realworld_nx
+```
+
+| experiment | what it produces | figure | tables |
+|---|---|---|---|
+| **performance** | 5-metric panel vs mixing `muw` (LFR) / `xi` (ABCD+o²) | `performance_<bmk>_1x5.pdf` | best-baseline, seed dispersion |
+| **scalability** | runtime vs graph size, log-y | `scalability_<bmk>_runtime_logy.pdf` | runtime by size bin |
+| **overlap** | 4-metric panel vs overlap `eta`, with seed error bands | `overlap_<bmk>_1x4.pdf` | overlap stability |
+| **realworld** | Q_ov + runtime grouped bars | `realworld_qov_runtime.pdf` | real-world main |
+
+Outputs land in `results/experiments/{plots,tables}/` as **pdf + png** figures and
+**csv + tex** tables (the LaTeX is paper-ready). Visual style (Highway in crimson,
+large fonts, 1×N panels, error bands) is vendored from the paper's figure code, so
+figures match. Metric computation (ONMI/F\*) dominates runtime — budget a few
+seconds per graph; a hard per-algorithm `--timeout` bounds any pathological case.
+
+```bash
+# score one real-world graph directly (Q_ov + runtime)
+python examples/run_realworld.py --graph /path/to/graph.gpickle --timeout 300
 ```
 
 ---
