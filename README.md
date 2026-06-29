@@ -190,4 +190,3 @@ examples/                # run_synthetic.py, run_realworld.py, add_your_algorith
 ## License
 
 BSD 2-Clause — see [LICENSE](LICENSE).
->>>>>>> b0fa463 (Initial commit: Highway OCD benchmark harness)
